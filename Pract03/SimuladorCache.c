@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-
+#include <stdbool.h>
+#include <unistd.h>
 
 
 
@@ -65,16 +66,16 @@ int calcularTamCache(int x){
 		nbites++;
 	}
 	if(y>1){
-		printf("Tamaño de la cache: %d B = %d*2^%d B",x,y,nbites);
+		printf("Tamaño de la cache: %d B = %d*2^%d B\n",x,y,nbites);
 	}
 	else{
-		printf("Tamaño de la cachè: %d B = 2^%d B", x, nbites);
+		printf("Tamaño de la cachè: %d B = 2^%d B\n", x, nbites);
 	}
 	return nbites;
 }
 
 
-void main (int argc, char **argv){
+int main(int argc, char **argv){
 
 
 	int Tlin; //Tamaño de línea: tamaño en bytes potencia de dos.
@@ -85,6 +86,8 @@ void main (int argc, char **argv){
 	FILE *trazaFile;
 
 	int bLin, bConj, bTag, tCache;
+	int nAccesos = 0;
+	int nFallos = 0;
 
 	if(argc != 3){
 		perror("ERROR faltan parametros de entrada");
@@ -99,6 +102,14 @@ void main (int argc, char **argv){
 		}
 		configurarCache(configFile,&Tlin, &Ncon, &Asoc, &Reem);
 
+		unsigned long int **cache;
+        cache  = (unsigned long int**)malloc(Ncon*sizeof(unsigned long int*));
+        for(int i = 0;i< Ncon;i++){
+            cache[i] = (unsigned long int*)malloc(Asoc*sizeof(unsigned long int));
+            for(int j = 0;j<Asoc;j++){
+                cache[i][j] = 0;
+            }
+        }
 
 		printf("Tlin: %d\n", Tlin);
 		printf("Ncon: %d\n", Ncon);
@@ -106,19 +117,61 @@ void main (int argc, char **argv){
 		printf("Reem: %d\n", Reem);
 
 		bLin = calcularBits(Tlin);
-		printf("Bits para el bloque: %d\n", bLin);
 		bConj = calcularBits(Ncon);
-		printf("Bits para el conjunto: %d\n", bConj);
 		bTag = 48 - bLin - bConj;
-		printf("Bits para el tag: %d\n",bTag);
 		tCache = Tlin*Asoc*Ncon;
 		int b = calcularTamCache(tCache);
+		int y = 0;
+		unsigned long int traza;
+		unsigned long int conjunto;
+		unsigned long int tag;
+        unsigned long int aux;
+		while (fscanf(trazaFile, "%lx \n", &traza) != EOF){
+			nAccesos++;
+			conjunto = rangoBits(traza, bLin, bLin + bConj - 1);
+			tag = rangoBits(traza, bLin + bConj, 47);
+			unsigned long int aux;
+			bool acierto = false;
+			for(int i = 0;i < Asoc;i++){
+				if((cache[conjunto][i]) == tag){
+					acierto = true;
+					if(Reem){
+                        if(i != 0){
+                            aux = cache[conjunto][i];
+                            for(;i > 0;i--){
+                                cache[conjunto][i-1];
+                            }
+                            cache[conjunto][0] = aux;
+                        }
+					}
+					break;
+				}
+			}
+			if(!acierto){
+				//printf("Fallo en while %d: \n", y);
+				nFallos++;
+				int pos = 0;
+				int aux = 0;
+				if(Reem){
+					for(int k = Asoc;k > 1;k--){
+                        cache[conjunto][k] = cache[conjunto][k-1];
+					}
+					cache[conjunto][0] = tag;
+				}
+				else{
+					pos = rand() % Asoc;
+                    cache[conjunto][pos] = tag;
+				}
+			}
+			y++;
+		}
+		double porcError = ((double)nFallos/nAccesos)*100;
+		printf("Porcentaje de fallos: %.2f% \n", porcError);
+        for(int i = 0;i < Ncon;i++){
+            free(cache[i]);
+        }
+		free(cache);
 
-
-
+		return 0;
 	}
-
-
-
 }
-
