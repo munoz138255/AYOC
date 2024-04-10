@@ -1,4 +1,4 @@
-Tlin: 128
-Ncon: 32
-Asoc: 4
-Reem: 0
+Tlin: 64
+Ncon: 64
+Asoc: 2
+Reem: 1
